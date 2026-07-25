@@ -10,22 +10,46 @@ Built on [Pydantic AI](https://ai.pydantic.dev/) and the deep-agent harness from
 
 ## Architecture
 
-![Architecture](docs/assets/architecture.svg)
+OpenAgents builds on [pydantic-deepagents](https://github.com/vstorm-co/pydantic-deepagents) and [Pydantic AI](https://ai.pydantic.dev/): planning, filesystem tools, subagents, skills, memory, hooks, summarization, and cost tracking are deep-agent capabilities. OpenAgents wraps that core in a product workspace — AG-UI, Agents, documents, MCP, Admin, and multi-user auth/storage.
 
 ```mermaid
-flowchart LR
-  Web["Web<br/>Next.js · AG-UI"]
-  API["API<br/>FastAPI · Pydantic AI"]
-  Agents["Agents<br/>agents/&lt;slug&gt;/"]
-  Sandbox["Sandbox<br/>local · docker"]
-  MCP["MCP servers<br/>optional"]
-  Models["Models<br/>OpenRouter-first"]
-
+flowchart TB
+  Web["Web · Next.js · AG-UI"]
+  API["API · FastAPI"]
   Web <--> API
-  API --> Agents
-  API --> Sandbox
-  API --> MCP
-  API --> Models
+
+  subgraph OA["OpenAgents"]
+    direction TB
+
+    Plan["Planning"]
+    FS["Filesystem"]
+    Sub["Subagents"]
+    Skills["Skills"]
+    Agents["Agents"]
+    Docs["Documents · HITL"]
+
+    Plan --> Deep
+    FS --> Deep
+    Sub --> Deep
+    Skills --> Deep
+    Agents --> Deep
+    Docs --> Deep
+
+    Sum["Summarization"] --> Deep
+    Cost["Cost tracking"] --> Deep
+    Hooks["Hooks · security"] --> Deep
+    Mem["Memory"] --> Deep
+    MCP["MCP · image gen"] --> Deep
+    Models["OpenRouter-first models"] --> Deep
+
+    Deep["Deep Agent<br/>(pydantic-ai · pydantic-deep)"]
+
+    Deep --> State["Workspace state · DB"]
+    Deep --> Local["Local backend"]
+    Deep --> Docker["Docker sandbox"]
+  end
+
+  API --> Deep
 ```
 
 ## Quickstart

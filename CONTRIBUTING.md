@@ -85,7 +85,8 @@ Guidelines:
 
 ## Docs & demo assets
 
-- Architecture SVG: `docs/assets/architecture.svg`
+- Architecture diagram: Mermaid block in the root [README](README.md) (prefer editing that over adding a separate image)
+- Hero screenshot: `docs/assets/ui.webp`
 - Optional demo GIF: contributors can add `docs/assets/demo.gif` (do not commit huge binaries)
 
 ## License
