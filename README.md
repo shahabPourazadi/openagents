@@ -2,11 +2,11 @@
 
 Self-hostable agent workspace specialized via Agents.
 
-Pick an agent (or build one), chat with a deep agent over AG-UI, optionally edit a markdown document with Accept/Reject suggestions, and run tools in a local or Docker sandbox — all on your own machine or VPS.
+Pick an agent (or build one), chat with a deep agent over AG-UI, optionally edit a markdown document with Accept/Reject suggestions, and run tools in a local or Docker sandbox — on your machine or a VPS.
 
 ![OpenAgents workspace](docs/assets/ui.webp)
 
-Built on [Pydantic AI](https://ai.pydantic.dev/) and the deep-agent harness from [pydantic-deepagents](https://github.com/vstorm-co/pydantic-deepagents) — OpenAgents turns that stack into a full product workspace (AG-UI, Agents, documents, MCP, Admin, and multi-user auth).
+Built on [Pydantic AI](https://ai.pydantic.dev/) and the deep-agent harness from [pydantic-deepagents](https://github.com/vstorm-co/pydantic-deepagents). OpenAgents layers a full product workspace on that stack: AG-UI, Agents, documents, MCP, Admin, and multi-user auth.
 
 ## Architecture
 
@@ -28,7 +28,7 @@ flowchart LR
   API --> Models
 ```
 
-## 5-minute quickstart
+## Quickstart
 
 ### Option A — Docker Compose
 
@@ -63,7 +63,18 @@ pnpm dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-On first boot with an empty DB, OpenAgents seeds one sample workspace per built-in agent for the open-auth user so the UI is not blank.
+On first boot with an empty database, OpenAgents seeds one sample workspace per built-in agent for the open-auth user.
+
+## Auth and database (Supabase)
+
+For production or multi-user installs, OpenAgents can use [Supabase](https://supabase.com/) for **authentication** and optionally for the **Postgres** database that stores workspaces, threads, and messages.
+
+| Concern | Local default | Production option |
+|---------|---------------|-------------------|
+| Sign-in | `AUTH_MODE=none` | [Supabase Auth](https://supabase.com/auth) (`AUTH_MODE=supabase`) |
+| App data | SQLite | [Supabase Postgres](https://supabase.com/database) via `DATABASE_URL` |
+
+Auth and the app database are **independent**: enabling Supabase Auth alone does not move chat data off SQLite. You can use either or both. Setup details: [docs/configuration.md](docs/configuration.md#auth--database-supabase).
 
 ## Agents
 
@@ -72,11 +83,11 @@ An **Agent** is a folder that specializes the workspace agent: persona, skills, 
 ```
 agents/<slug>/
   agent.yaml           # name, description, icon, uses_document, predefined_skills, …
-  agent.md            # required persona / operating instructions
-  soul.md             # optional tone
-  system_prompt.md    # optional; falls back to a OpenAgents default
+  agent.md             # required persona / operating instructions
+  soul.md              # optional tone
+  system_prompt.md     # optional; falls back to an OpenAgents default
   templates/
-    document.md       # when uses_document: true
+    document.md        # when uses_document: true
   skills/
     <skill-slug>/
       SKILL.md
@@ -107,27 +118,28 @@ OpenAgents is an **agent workspace** — the product layer around a deep agent h
 | 🔧 | **Tool-calling** | File read/write/edit, shell (sandbox), glob/grep, uploads, document parse |
 | 🤝 | **Subagents + plan** | Deep builtins for plan mode, todos, and subagent delegation when enabled |
 | 🧠 | **Persistent memory** | `MEMORY.md` / persona files seeded per workspace and injected into runs |
-| ♾️ | **Long context** | Auto-summarization near the model token budget — conversations keep going |
+| ♾️ | **Long context** | Auto-summarization near the model token budget |
 | 🐳 | **Sandboxed execution** | `local` or `docker` sandbox; soft-degrades to filesystem-only when busy |
 | 📚 | **Skills system** | On-demand `SKILL.md` playbooks; library + predefined skills; `/` mentions |
 | 📄 | **Document parsing** | PDF/DOCX/XLSX/PPTX and images via LiteParse (optional OCR) |
 | 🔌 | **MCP** | Attach HTTP MCP servers — Firecrawl, OpenRouter, or your own |
-| 🖼️ | **Image generation** | Via OpenRouter MCP (`generate_image` and related tools); results become durable assets in chat |
-| 🛡️ | **Security presets** | Filesystem hooks + optional prompt-injection / secret-redaction / tool-guard capabilities |
+| 🖼️ | **Image generation** | Via OpenRouter MCP; results become durable assets in chat |
+| 🔐 | **Supabase-ready** | Optional [Supabase Auth](https://supabase.com/auth) and [Postgres](https://supabase.com/database) |
+| 🛡️ | **Security presets** | Filesystem hooks + optional prompt-injection / secret-redaction / tool-guard |
 | 💰 | **Cost tracking** | Token + USD spend per run, sidebar totals, hard budget limits |
 | 🌐 | **OpenRouter-first models** | Admin model tiers and ZDR; any pydantic-ai model id when keys are present |
 | ⚙️ | **Admin panel** | Tool groups, sandbox/runtime, models, safety toggles, optional signup queue |
 
-## Docs
+## Documentation
 
 | Doc | Topic |
 |-----|--------|
-| [docs/configuration.md](docs/configuration.md) | Environment variables; Supabase auth vs Postgres; where SQLite chats live |
+| [docs/configuration.md](docs/configuration.md) | Environment variables; auth; SQLite vs Supabase Postgres |
 | [docs/agents.md](docs/agents.md) | Authoring Agents (wizard, predefined skills) |
 | [docs/skills.md](docs/skills.md) | Library skills, icons, `/` mentions, API |
-| [docs/mcp.md](docs/mcp.md) | User MCP library, image generation, attach to agents, APIs |
+| [docs/mcp.md](docs/mcp.md) | MCP library, image generation, attach to agents |
 | [docs/sandbox.md](docs/sandbox.md) | Local vs Docker sandbox |
-| [docs/deployment.md](docs/deployment.md) | Compose and generic VPS |
+| [docs/deployment.md](docs/deployment.md) | Compose and VPS deployment |
 | [docs/admin-panel.md](docs/admin-panel.md) | Admin UI |
 | [docs/evals.md](docs/evals.md) | Agent eval harness |
 | [docs/adr/](docs/adr/) | Architecture decision records |
@@ -145,7 +157,7 @@ OpenAgents is an **agent workspace** — the product layer around a deep agent h
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). This is a portfolio / open-source project — PRs and agent contributions welcome.
+See [CONTRIBUTING.md](CONTRIBUTING.md). Pull requests and agent contributions are welcome.
 
 ## License
 

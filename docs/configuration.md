@@ -59,16 +59,25 @@ Example platform JSON:
 ]
 ```
 
-## Auth / Supabase (optional)
+## Auth & database (Supabase)
 
-Supabase **auth** and the app **database** are independent. Linking Supabase for login does **not** move threads or chats into Supabase Postgres.
+OpenAgents can run entirely locally (open auth + SQLite), or use [Supabase](https://supabase.com/) for production-ready **authentication** and/or **Postgres** storage.
 
-| Concern | What controls it | Default without Supabase |
-|---------|------------------|--------------------------|
-| Who can sign in | `AUTH_MODE` + Supabase auth keys | `AUTH_MODE=none` (open user `dev-user`) |
-| Where threads/chats live | `DATABASE_URL` (or `DATABASE_URL_LOCAL` / `DATABASE_URL_PRODUCTION`) | SQLite file (see below) |
+| Concern | What controls it | Local default | Production option |
+|---------|------------------|---------------|-------------------|
+| Who can sign in | `AUTH_MODE` + auth keys | `AUTH_MODE=none` (`dev-user`) | [Supabase Auth](https://supabase.com/auth) (`AUTH_MODE=supabase`) |
+| Where threads/chats live | `DATABASE_URL` (or `DATABASE_URL_LOCAL` / `DATABASE_URL_PRODUCTION`) | SQLite file | [Supabase Database](https://supabase.com/database) (Postgres) |
 
-### Where chats live without Supabase Postgres
+**Auth and the app database are independent.** Enabling Supabase Auth for login does **not** move threads or messages into Supabase Postgres. Common setups:
+
+- Local: open auth + SQLite
+- Auth only: Supabase Auth + SQLite
+- Full cloud: Supabase Auth + Supabase Postgres
+- Postgres only: any Postgres `DATABASE_URL` without Supabase Auth
+
+Create a project at [supabase.com](https://supabase.com/). Keys and connection strings are under **Project Settings** (see [Supabase docs](https://supabase.com/docs)).
+
+### Where chats live (SQLite)
 
 Threads and messages are always stored by the API via `DATABASE_URL`, never in the browser.
 
@@ -77,38 +86,36 @@ Threads and messages are always stored by the API via `DATABASE_URL`, never in t
 | Docker Compose | `./data/openagents.db` inside the API container → Docker volume `api-data` |
 | Local `uvicorn` (default) | `./openagents.db` relative to the API working directory |
 
-### Auth only (keep SQLite)
+### Supabase Auth (keep SQLite)
 
 1. Set `AUTH_MODE=supabase`.
 2. Fill the Supabase auth keys below (API + web `NEXT_PUBLIC_*`).
 3. Leave `DATABASE_URL` on SQLite.
 
-Users sign in with Supabase Auth; workspaces, threads, and messages stay in local SQLite.
+Users sign in with [Supabase Auth](https://supabase.com/auth); workspaces, threads, and messages stay in local SQLite.
 
 | Variable | Description |
 |----------|-------------|
-| `SUPABASE_URL` | Project URL |
-| `SUPABASE_ANON_KEY` | Anon key |
-| `SUPABASE_SERVICE_ROLE_KEY` | Service role (admin user delete, etc.) |
+| `SUPABASE_URL` | Project URL from [Supabase](https://supabase.com/) |
+| `SUPABASE_ANON_KEY` | Anon (public) key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service role key (admin user delete, etc.) |
 | `SUPABASE_JWT_SECRET` | JWT secret for Bearer verification |
-| `NEXT_PUBLIC_SUPABASE_URL` | Web client |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Web client |
+| `NEXT_PUBLIC_SUPABASE_URL` | Web client project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Web client anon key |
 
 ### App data on Supabase Postgres
 
-Use this when you want durable multi-user storage (recommended with Supabase auth in production).
+Use this for durable multi-user storage (recommended with Supabase Auth in production).
 
-1. In Supabase: **Project Settings → Database** → copy the Postgres connection string.
-2. Convert it for the async driver, e.g.  
+1. In the [Supabase Dashboard](https://supabase.com/dashboard): **Project Settings → Database** → copy the Postgres connection string ([Database docs](https://supabase.com/docs/guides/database/overview)).
+2. Convert it for the async driver, for example:  
    `postgresql+asyncpg://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres`  
-   (or the direct host; use `asyncpg`, not the default `postgresql://` sync URL).
+   (or the direct host; use `asyncpg`, not the default sync `postgresql://` URL).
 3. Set `DATABASE_URL` (or `DATABASE_URL_LOCAL` / `DATABASE_URL_PRODUCTION` per `APP_ENV`).
-4. Apply schema from [`supabase/migrations/`](../supabase/migrations/) (Supabase CLI / SQL editor). On a fresh empty DB the API also runs `create_all` at startup, but the SQL migrations are the source of truth for Postgres/RLS-oriented installs.
+4. Apply schema from [`supabase/migrations/`](../supabase/migrations/) (Supabase CLI or SQL editor). On a fresh empty database the API also runs `create_all` at startup; the SQL migrations remain the source of truth for Postgres installs.
 5. Restart the API.
 
-**Existing SQLite data is not migrated automatically.** Switching `DATABASE_URL` starts a new empty (or migration-applied) database. Export/import manually if you need to keep local chats.
-
-You can combine both: Supabase auth **and** Supabase Postgres. You can also use Supabase auth with SQLite, or Postgres without Supabase auth.
+**Existing SQLite data is not migrated automatically.** Switching `DATABASE_URL` starts a new empty (or migration-applied) database. Export or import manually if you need to keep local chats.
 
 ## Signup queue (optional)
 
@@ -122,7 +129,7 @@ You can combine both: Supabase auth **and** Supabase Postgres. You can also use 
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DEFAULT_SPEND_BUDGET_USD` | `5.0` | Per-user lifetime soft cap until a payment gateway exists |
+| `DEFAULT_SPEND_BUDGET_USD` | `5.0` | Per-user lifetime spend cap (soft budget until billing is added) |
 
 Admins can override per-user budgets in the admin panel.
 

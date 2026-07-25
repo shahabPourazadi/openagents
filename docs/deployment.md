@@ -1,6 +1,6 @@
 # Deployment
 
-OpenAgents is designed to self-host. Local Compose is the primary path; any VPS that can run Docker works the same way.
+OpenAgents is designed for self-hosting. Docker Compose is the recommended path; any VPS that can run Docker works the same way. For multi-user production, use [Supabase](https://supabase.com/) Auth and Postgres — see [configuration.md](configuration.md#auth--database-supabase).
 
 ## Docker Compose (recommended)
 
@@ -23,15 +23,15 @@ Services:
 
 Stop with `docker compose down`. Data persists in named volumes (`api-data`, `api-uploads`). With the default Compose `DATABASE_URL`, threads and chats are in SQLite at `./data/openagents.db` on the `api-data` volume.
 
-### Production-ish Compose checklist
+### Production Compose checklist
 
 1. Set a strong `OPENROUTER_API_KEY`.
-2. Point `NEXT_PUBLIC_API_URL` at your public API URL before building web.
+2. Point `NEXT_PUBLIC_API_URL` at your public API URL before building the web image.
 3. Set `API_CORS_ORIGINS` to your public web origin.
-4. For multi-user auth: `AUTH_MODE=supabase` plus Supabase auth env vars (see [configuration.md](configuration.md#auth--supabase-optional)).
-5. Prefer Postgres over SQLite for durable multi-user installs — set `DATABASE_URL=postgresql+asyncpg://…` (e.g. Supabase Postgres) and apply [`supabase/migrations/`](../supabase/migrations/). Auth and the app DB are independent; linking Supabase auth alone does **not** move SQLite chats. Details: [configuration.md](configuration.md#app-data-on-supabase-postgres).
-6. Set `AGENT_SANDBOX=docker` only if the API container/host can reach a Docker daemon and you’ve built the sandbox image (see [sandbox.md](sandbox.md)).
-7. Put TLS termination (Caddy, nginx, Traefik, or your host’s reverse proxy) in front of `:3000` / `:8000`.
+4. For multi-user auth: create a project at [supabase.com](https://supabase.com/), set `AUTH_MODE=supabase`, and configure the Supabase auth env vars (see [configuration.md](configuration.md#auth--database-supabase)).
+5. Prefer Postgres over SQLite for durable multi-user installs — set `DATABASE_URL=postgresql+asyncpg://…` (for example [Supabase Database](https://supabase.com/database)) and apply [`supabase/migrations/`](../supabase/migrations/). Auth and the app database are independent; enabling Supabase Auth alone does **not** move SQLite chats. Details: [configuration.md](configuration.md#app-data-on-supabase-postgres).
+6. Set `AGENT_SANDBOX=docker` only if the API container or host can reach a Docker daemon and you have built the sandbox image (see [sandbox.md](sandbox.md)).
+7. Terminate TLS in front of `:3000` / `:8000` (Caddy, nginx, Traefik, or your host reverse proxy).
 
 ## Generic VPS
 

@@ -1,8 +1,8 @@
 # Admin panel
 
-OpenAgents' admin UI lives at `/admin`. In open auth (`AUTH_MODE=none`), the default `dev-user` is treated as an active admin so you can exercise toggles locally without Supabase.
+The admin UI lives at `/admin`. With open auth (`AUTH_MODE=none`), the default `dev-user` is treated as an active admin so you can configure the system locally without [Supabase](https://supabase.com/).
 
-With `AUTH_MODE=supabase`, only profiles with `role = 'admin'` and `status = 'active'` can access admin routes. Promote admins via SQL / Studio (no in-app promotion):
+With `AUTH_MODE=supabase`, only profiles with `role = 'admin'` and `status = 'active'` can access admin routes. Promote admins via SQL or the [Supabase Dashboard](https://supabase.com/dashboard) (there is no in-app promotion flow):
 
 ```sql
 update public.profiles
@@ -25,7 +25,7 @@ where email in ('you@example.com');
 
 ## Local open-auth tip
 
-No signup queue is required for portfolio demos. Leave `FEATURE_SIGNUP_QUEUE=false` and use Admin mainly for model tiers and sandbox/tool toggles.
+For local development, leave `FEATURE_SIGNUP_QUEUE=false` and use Admin for model tiers, sandbox settings, and tool toggles.
 
 ## Related
 
