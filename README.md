@@ -4,7 +4,7 @@ Self-hostable agent workspace specialized via Agents.
 
 Pick an agent (or build one), chat with a deep agent over AG-UI, optionally edit a markdown document with Accept/Reject suggestions, and run tools in a local or Docker sandbox — all on your own machine or VPS.
 
-![OpenAgents workspace](docs/assets/ui.png)
+![OpenAgents workspace](docs/assets/ui.webp)
 
 Built on [Pydantic AI](https://ai.pydantic.dev/) and the deep-agent harness from [pydantic-deepagents](https://github.com/vstorm-co/pydantic-deepagents) — OpenAgents turns that stack into a full product workspace (AG-UI, Agents, documents, MCP, Admin, and multi-user auth).
 
