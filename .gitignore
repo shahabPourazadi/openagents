@@ -1,0 +1,30 @@
+node_modules
+.next
+.venv
+__pycache__
+*.pyc
+.env
+.env.local
+apps/api/openagents.db
+apps/api/*.db
+apps/api/data
+.DS_Store
+dist
+*.egg-info
+
+# IDE / local
+.cursor/
+.agents/
+.nested-git-backups/
+
+# Nested envs / caches (belt and suspenders)
+apps/**/.env
+apps/**/.env.*
+!**/.env.example
+apps/**/.venv/
+apps/**/node_modules/
+apps/**/.next/
+.local/
+.local/**
+COMPARISON-pydantic-deep-full-app.md
+**/COMPARISON-pydantic-deep-full-app.md

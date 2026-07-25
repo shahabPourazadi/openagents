@@ -1,0 +1,12 @@
+name: Research Assistant
+slug: research-assistant
+description: Research a topic with web tools and draft structured notes via accept/reject suggestions.
+icon: book
+uses_document: true
+document_template: templates/document.md
+tool_groups:
+  hitl: true
+  firecrawl: true
+  document_parse: true
+  deep_builtins: true
+default_model: null

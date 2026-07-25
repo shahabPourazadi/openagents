@@ -1,0 +1,35 @@
+# Build context is the repo root (see docker-compose.yml).
+# Keep local caches/deps out of image COPY layers.
+
+.git
+.github
+.cursor
+.agents
+.local
+.DS_Store
+
+**/.next
+**/node_modules
+**/__pycache__
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+**/.venv
+**/venv
+**/.turbo
+**/dist
+**/coverage
+**/*.pyc
+**/openagents.db
+**/*.db
+apps/api/data
+
+.env
+.env.*
+!.env.example
+
+docs
+CONTEXT.md
+CONTRIBUTING.md
+LICENSE
+package.json

@@ -1,0 +1,61 @@
+[project]
+name = "openagents-api"
+version = "0.1.0"
+description = "OpenAgents API — self-hostable agent workspace"
+readme = "README.md"
+authors = [
+    { name = "shah", email = "spourazadi@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "aiofiles>=25.1.0",
+    "aiosqlite>=0.22.1",
+    "asyncpg>=0.31.0",
+    "boto3>=1.43.50",
+    "fastapi>=0.139.0",
+    "greenlet>=3.5.3",
+    "httpx>=0.28.1",
+    "logfire>=4.37.0",
+    "pillow>=12.3.0",
+    "pydantic-ai-backend[console,docker]>=0.2.15",
+    "pydantic-ai-shields>=0.3.4",
+    "pydantic-ai-todo>=0.2.6",
+    "pydantic-ai[ag-ui,openrouter]>=2.8.0",
+    "pydantic-deep[liteparse]>=0.3.35",
+    "pydantic-settings>=2.14.2",
+    "python-jose[cryptography]>=3.5.0",
+    "python-multipart>=0.0.32",
+    "sqlalchemy>=2.0.51",
+    "supabase>=2.31.0",
+    "uvicorn[standard]>=0.51.0",
+]
+
+[project.scripts]
+openagents-api = "openagents_api:main"
+
+[build-system]
+requires = ["uv_build>=0.11.26,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "moto>=5.2.2",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+markers = [
+    "integration: hits live external services (Garage S3)",
+    "docker: requires Docker daemon (set OPENAGENTS_DOCKER_TESTS=1)",
+    "eval: opt-in live evals (set OPENAGENTS_EVALS=1 and OPENROUTER_API_KEY)",
+]
+
+# Ruff 0.16 expanded defaults from 59 → 413 rules. Keep the pre-0.16 set until
+# we deliberately adopt the new rules (many FastAPI Depends() trip B008).
+# https://astral.sh/blog/ruff-v0.16.0
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]

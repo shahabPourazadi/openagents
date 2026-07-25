@@ -1,0 +1,81 @@
+# Local OpenAgents stack: API (SQLite + open auth) + web.
+# Copy .env.example → .env and set OPENROUTER_API_KEY to chat with the agent.
+services:
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      # Core — open/single-user by default (AUTH_MODE=none; AUTH_BYPASS=true still works)
+      DATABASE_URL: sqlite+aiosqlite:///./data/openagents.db
+      API_CORS_ORIGINS: http://localhost:3000
+      AUTH_MODE: ${AUTH_MODE:-none}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      DEFAULT_MODEL: ${DEFAULT_MODEL:-openrouter:anthropic/claude-sonnet-4}
+      WORKSPACE_TMP_ROOT: /tmp/openagents-workspaces
+      TEMPLATES_DIR: /app/templates
+      AGENTS_DIR: /app/agents
+      SKILLS_DIR: /app/skills
+      FEATURE_SIGNUP_QUEUE: ${FEATURE_SIGNUP_QUEUE:-false}
+      # Agent sandbox
+      AGENT_SANDBOX: ${AGENT_SANDBOX:-local}
+      AGENT_EXECUTE: ${AGENT_EXECUTE:-true}
+      AGENT_SANDBOX_IMAGE: ${AGENT_SANDBOX_IMAGE:-openagents-agent-sandbox:latest}
+      AGENT_SANDBOX_MAX_CONCURRENT: ${AGENT_SANDBOX_MAX_CONCURRENT:-1}
+      # Optional MCP
+      FIRECRAWL_API_KEY: ${FIRECRAWL_API_KEY:-}
+      MCP_SERVERS_JSON: ${MCP_SERVERS_JSON:-}
+      # Optional Supabase (when AUTH_MODE=supabase)
+      SUPABASE_URL: ${SUPABASE_URL:-https://base.example.com}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:-}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
+      SUPABASE_JWT_SECRET: ${SUPABASE_JWT_SECRET:-}
+      # Optional signup queue mail
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-}
+      # Optional observability
+      LOGFIRE_TOKEN: ${LOGFIRE_TOKEN:-}
+      LOGFIRE_ENABLED: ${LOGFIRE_ENABLED:-false}
+      LANGFUSE_ENABLED: ${LANGFUSE_ENABLED:-false}
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
+      LANGFUSE_BASE_URL: ${LANGFUSE_BASE_URL:-https://tele.example.com}
+      LANGFUSE_OTEL_ENDPOINT: ${LANGFUSE_OTEL_ENDPOINT:-}
+      # Optional S3 uploads
+      OPENAGENTS_S3_ENDPOINT: ${OPENAGENTS_S3_ENDPOINT:-}
+      OPENAGENTS_S3_REGION: ${OPENAGENTS_S3_REGION:-garage}
+      OPENAGENTS_S3_BUCKET: ${OPENAGENTS_S3_BUCKET:-}
+      OPENAGENTS_S3_ACCESS_KEY_ID: ${OPENAGENTS_S3_ACCESS_KEY_ID:-}
+      OPENAGENTS_S3_SECRET_ACCESS_KEY: ${OPENAGENTS_S3_SECRET_ACCESS_KEY:-}
+      OPENAGENTS_S3_FORCE_PATH_STYLE: ${OPENAGENTS_S3_FORCE_PATH_STYLE:-true}
+      OPENAGENTS_S3_SSE_C_KEY_BASE64: ${OPENAGENTS_S3_SSE_C_KEY_BASE64:-}
+      DEFAULT_SPEND_BUDGET_USD: ${DEFAULT_SPEND_BUDGET_USD:-5.0}
+      # Dump tool-media decode diagnostics to /tmp when image promote fails
+      OPENAGENTS_DEBUG_TOOL_MEDIA: ${OPENAGENTS_DEBUG_TOOL_MEDIA:-true}
+    volumes:
+      - api-data:/app/data
+      - api-uploads:/tmp/openagents-uploads
+      - ./templates:/app/templates:ro
+      - ./agents:/app/agents:ro
+      - ./skills:/app/skills:ro
+    command: uvicorn openagents_api.main:app --host 0.0.0.0 --port 8000
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+        # Leave unset for AUTH_MODE=none so the web app uses the open-auth demo user.
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
+volumes:
+  api-data:
+  api-uploads:

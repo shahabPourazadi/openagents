@@ -1,0 +1,6 @@
+name: Agent Builder
+slug: agent-builder
+description: Interview you about a workflow and register a new Agent.
+icon: hammer
+uses_document: false
+default_model: null

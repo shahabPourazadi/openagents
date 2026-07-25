@@ -1,0 +1,53 @@
+"""Legacy compatibility shim — prefer ``openagents_api.agents``."""
+
+from __future__ import annotations
+
+from openagents_api.agents import (  # noqa: F401
+    DEFAULT_AGENT_SLUG as DEFAULT_PACK_SLUG,
+    DEFAULT_SYSTEM_PROMPT,
+    AgentError as PackError,
+    AgentManifest as PackManifest,
+    AgentSkill as PackSkill,
+    LoadedAgent as LoadedPack,
+    agents_root as packs_root,
+    builtin_slug_exists,
+    get_user_agent_row as get_user_pack_row,
+    list_builtin_agents as list_builtin_packs,
+    load_agent as load_pack,
+    loaded_agent_from_user_row as loaded_pack_from_user_row,
+    materialize_agent_skills as materialize_pack_skills,
+    materialize_user_agent_files as materialize_user_pack_files,
+    agent_skills_as_tuples as pack_skills_as_tuples,
+    read_agent_dir_from_workspace as read_pack_dir_from_workspace,
+    resolve_agent as resolve_pack,
+    slugify_agent_name as slugify_pack_name,
+    try_load_agent as try_load_pack,
+    user_agent_cache_root as user_pack_cache_root,
+    validate_agent_draft as validate_pack_draft,
+    validate_agent_slug as validate_pack_slug,
+)
+
+__all__ = [
+    "DEFAULT_PACK_SLUG",
+    "DEFAULT_SYSTEM_PROMPT",
+    "PackError",
+    "PackManifest",
+    "PackSkill",
+    "LoadedPack",
+    "packs_root",
+    "builtin_slug_exists",
+    "get_user_pack_row",
+    "list_builtin_packs",
+    "load_pack",
+    "loaded_pack_from_user_row",
+    "materialize_pack_skills",
+    "materialize_user_pack_files",
+    "pack_skills_as_tuples",
+    "read_pack_dir_from_workspace",
+    "resolve_pack",
+    "slugify_pack_name",
+    "try_load_pack",
+    "user_pack_cache_root",
+    "validate_pack_draft",
+    "validate_pack_slug",
+]

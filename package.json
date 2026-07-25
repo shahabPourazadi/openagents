@@ -1,0 +1,10 @@
+{
+  "name": "openagents",
+  "private": true,
+  "scripts": {
+    "dev:web": "pnpm --dir apps/web dev",
+    "dev:api": "uv --directory apps/api run uvicorn openagents_api.main:app --reload --port 8000",
+    "dev": "pnpm dev:web",
+    "build:web": "pnpm --dir apps/web build"
+  }
+}

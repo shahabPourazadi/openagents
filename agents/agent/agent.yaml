@@ -1,0 +1,12 @@
+name: Auto Agent
+slug: agent
+description: Default agent with access to all skills and MCP servers — routes across research, coding, and agent authoring as needed.
+icon: mouse-pointer-2
+uses_document: true
+document_template: templates/document.md
+tool_groups:
+  hitl: true
+  firecrawl: true
+  document_parse: true
+  deep_builtins: true
+default_model: null
