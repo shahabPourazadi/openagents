@@ -12,44 +12,33 @@ Built on [Pydantic AI](https://ai.pydantic.dev/) and the deep-agent harness from
 
 OpenAgents builds on [pydantic-deepagents](https://github.com/vstorm-co/pydantic-deepagents) and [Pydantic AI](https://ai.pydantic.dev/): planning, filesystem tools, subagents, skills, memory, hooks, summarization, and cost tracking are deep-agent capabilities. OpenAgents wraps that core in a product workspace — AG-UI, Agents, documents, MCP, Admin, and multi-user auth/storage.
 
-```mermaid
-flowchart TB
-  Web["Web · Next.js · AG-UI"]
-  API["API · FastAPI"]
-  Web <--> API
-
-  subgraph OA["OpenAgents"]
-    direction TB
-
-    Plan["Planning"]
-    FS["Filesystem"]
-    Sub["Subagents"]
-    Skills["Skills"]
-    Agents["Agents"]
-    Docs["Documents · HITL"]
-
-    Plan --> Deep
-    FS --> Deep
-    Sub --> Deep
-    Skills --> Deep
-    Agents --> Deep
-    Docs --> Deep
-
-    Sum["Summarization"] --> Deep
-    Cost["Cost tracking"] --> Deep
-    Hooks["Hooks · security"] --> Deep
-    Mem["Memory"] --> Deep
-    MCP["MCP · image gen"] --> Deep
-    Models["OpenRouter-first models"] --> Deep
-
-    Deep["Deep Agent<br/>(pydantic-ai · pydantic-deep)"]
-
-    Deep --> State["Workspace state · DB"]
-    Deep --> Local["Local backend"]
-    Deep --> Docker["Docker sandbox"]
-  end
-
-  API --> Deep
+```
+                              OpenAgents
++---------------------------------------------------------------------------+
+|                                                                           |
+|   Web (Next.js · AG-UI)  <------------------>  API (FastAPI)              |
+|                                                      |                    |
+|   +----------+ +----------+ +----------+ +--------+ +----------+ +-----+  |
+|   | Planning | |Filesystem| | Subagents| | Skills | |  Agents  | |Docs |  |
+|   +----+-----+ +----+-----+ +----+-----+ +---+----+ +----+-----+ +--+--+  |
+|        |            |            |           |           |          |     |
+|        +------------+-----+------+-----------+-----------+----------+     |
+|                           |                                               |
+|                           v                                               |
+|  Summarization --> +------------------+ <-- Hooks · security              |
+|  Cost tracking --> |    Deep Agent    | <-- Memory                        |
+|  OpenRouter    --> | (pydantic-ai ·   | <-- MCP · image gen               |
+|  models        --> |  pydantic-deep)  |                                   |
+|                    +--------+---------+                                   |
+|                             |                                             |
+|           +-----------------+-----------------+                           |
+|           v                 v                 v                           |
+|    +------------+    +------------+    +------------+                     |
+|    | Workspace  |    |   Local    |    |   Docker   |                     |
+|    | state · DB |    |  backend   |    |  sandbox   |                     |
+|    +------------+    +------------+    +------------+                     |
+|                                                                           |
++---------------------------------------------------------------------------+
 ```
 
 ## Quickstart
