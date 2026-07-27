@@ -21,7 +21,7 @@
     "@mantine/core": "^9.4.1",
     "@mantine/hooks": "^9.4.1",
     "@paper-design/shaders-react": "^0.0.77",
-    "@supabase/ssr": "^0.12.0",
+    "@supabase/ssr": "^0.12.3",
     "@supabase/supabase-js": "^2.110.8",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
