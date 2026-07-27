@@ -103,6 +103,7 @@ export type Workspace = {
   /** @deprecated Legacy API mirror; prefer agent_slug. */
   pack_slug?: string;
   uses_document?: boolean;
+  uses_canvas?: boolean;
   agent_md?: string | null;
   soul_md?: string | null;
 };
@@ -118,6 +119,7 @@ export type Agent = {
   description?: string;
   icon?: string;
   uses_document: boolean;
+  uses_canvas?: boolean;
   source: "builtin" | "user";
   skills?: {
     slug: string;
@@ -153,6 +155,7 @@ export type AgentCreateInput = {
   description?: string;
   icon?: string;
   uses_document?: boolean;
+  uses_canvas?: boolean;
   agent_md?: string;
   soul_md?: string;
   system_prompt?: string;
@@ -168,6 +171,7 @@ export type AgentUpdateInput = {
   description?: string;
   icon?: string;
   uses_document?: boolean;
+  uses_canvas?: boolean;
   agent_md?: string;
   soul_md?: string;
   system_prompt?: string;
@@ -257,6 +261,16 @@ export type Document = {
   updated_at: string;
 };
 
+export type Canvas = {
+  id: string;
+  workspace_id: string;
+  title: string;
+  scene_json: Record<string, unknown>;
+  updated_at: string;
+  /** Bumped only on AI/live remote updates so the editor remounts without fighting local autosave. */
+  remote_rev?: number;
+};
+
 /** Legacy thread metadata — all threads use the deep stack at `/agent`. */
 export type AgentKind = "deep";
 
@@ -269,6 +283,7 @@ export type Thread = {
   agent_slug?: string | null;
   agent_kind?: AgentKind | string | null;
   active_document_id: string | null;
+  active_canvas_id?: string | null;
   usage?: {
     context_max?: number;
     context_used?: number;
@@ -350,9 +365,10 @@ export type WorkspaceUpload = {
   content_type: string;
 };
 
-/** What the right pane is editing (document vs persona vs workspace file). */
+/** What the right pane is editing (document vs canvas vs persona vs workspace file). */
 export type EditorTarget =
   | { type: "document" }
+  | { type: "canvas" }
   | { type: "persona"; key: "agent" | "soul" }
   | { type: "workspace_file"; id: string };
 
@@ -443,6 +459,7 @@ export function getMessageParts(m: ChatMessage): ChatContentPart[] {
 type AppState = {
   workspace: Workspace | null;
   documents: Document[];
+  canvases: Canvas[];
   workspaceFiles: WorkspaceFile[];
   workspaceAssets: WorkspaceAsset[];
   workspaceUploads: WorkspaceUpload[];
@@ -450,6 +467,7 @@ type AppState = {
   threads: Thread[];
   activeThreadId: string | null;
   activeDocumentId: string | null;
+  activeCanvasId: string | null;
   editorTarget: EditorTarget;
   setEditorTarget: (target: EditorTarget) => void;
   /** Left sidebar menu: Chats, Agents, Skills, MCP, or Files. */
@@ -534,6 +552,7 @@ type AppState = {
   setActiveThread: (id: string) => Promise<void>;
   setActiveDocument: (id: string) => void | Promise<void>;
   updateDocumentContent: (id: string, content_md: string) => Promise<void>;
+  updateCanvasScene: (id: string, scene_json: Record<string, unknown>) => Promise<void>;
   updatePersona: (patch: { agent_md?: string; soul_md?: string }) => Promise<void>;
   updateWorkspaceFile: (id: string, content_md: string) => Promise<void>;
   refreshWorkspaceFiles: () => Promise<void>;
@@ -592,6 +611,12 @@ type AppState = {
   }) => void;
   /** Apply auto-accepted AI additions to the active document (no Accept/Reject). */
   applyLiveDocumentContent: (contentMd: string) => void;
+  ingestCanvasCreated: (value: {
+    id?: string;
+    title?: string;
+    scene_json?: Record<string, unknown>;
+  }) => void;
+  applyLiveCanvasScene: (scene_json: Record<string, unknown>, canvasId?: string) => void;
   apiUrl: string;
   userId: string;
   /** Deep agent run endpoint prefix (POST /agent/{thread_id}). */
@@ -712,6 +737,7 @@ export function AppProvider({
   const agentRunPath = "/agent";
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [documents, setDocuments] = useState<Document[]>([]);
+  const [canvases, setCanvases] = useState<Canvas[]>([]);
   const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFile[]>([]);
   const [workspaceAssets, setWorkspaceAssets] = useState<WorkspaceAsset[]>([]);
   const [workspaceUploads, setWorkspaceUploads] = useState<WorkspaceUpload[]>(
@@ -723,6 +749,7 @@ export function AppProvider({
   const [threads, setThreads] = useState<Thread[]>([]);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [activeDocumentId, setActiveDocumentId] = useState<string | null>(null);
+  const [activeCanvasId, setActiveCanvasId] = useState<string | null>(null);
   const [editorTarget, setEditorTarget] = useState<EditorTarget>({ type: "document" });
   const [sidebarTab, setSidebarTabState] = useState<SidebarTab>(() => readUrlState().tab);
   const [chatsLibraryOpen, setChatsLibraryOpenState] = useState(
@@ -767,9 +794,11 @@ export function AppProvider({
   // Keep refs in sync so long-running send()/stream handlers never see a stale id
   // (e.g. new chat starts with null, then createThread assigns a document).
   const activeDocumentIdRef = useRef<string | null>(null);
+  const activeCanvasIdRef = useRef<string | null>(null);
   const activeThreadIdRef = useRef<string | null>(null);
   const workspaceRef = useRef<Workspace | null>(null);
   activeDocumentIdRef.current = activeDocumentId;
+  activeCanvasIdRef.current = activeCanvasId;
   activeThreadIdRef.current = activeThreadId;
   workspaceRef.current = workspace;
   /** After first bootstrap, never flash the full-page loader (it unmounts chat mid-stream). */
@@ -891,8 +920,12 @@ export function AppProvider({
     const reloadDocsAndThread = async () => {
       if (!ws) return;
       try {
-        const docs = await api<Document[]>(`/api/workspaces/${ws.id}/documents`);
+        const [docs, canvasRows] = await Promise.all([
+          api<Document[]>(`/api/workspaces/${ws.id}/documents`),
+          api<Canvas[]>(`/api/workspaces/${ws.id}/canvases`),
+        ]);
         setDocuments(docs);
+        setCanvases(canvasRows);
         if (threadId) {
           const ths = await api<Thread[]>(`/api/workspaces/${ws.id}/threads`);
           const live = ths.find((t) => t.id === threadId);
@@ -903,6 +936,7 @@ export function AppProvider({
                   ? {
                       ...t,
                       active_document_id: live.active_document_id,
+                      active_canvas_id: live.active_canvas_id ?? null,
                       title: live.title,
                       model: live.model,
                       updated_at: live.updated_at,
@@ -912,6 +946,9 @@ export function AppProvider({
             );
             if (live.active_document_id) {
               setActiveDocumentId(live.active_document_id);
+            }
+            if (live.active_canvas_id) {
+              setActiveCanvasId(live.active_canvas_id);
             }
           }
         }
@@ -1029,6 +1066,115 @@ export function AppProvider({
     );
   }, []);
 
+  const ingestCanvasCreated = useCallback(
+    (value: {
+      id?: string;
+      title?: string;
+      scene_json?: Record<string, unknown>;
+    }) => {
+      const id = (value.id || "").trim();
+      if (!id) return;
+      const wsId = workspaceRef.current?.id || "";
+      const row: Canvas = {
+        id,
+        workspace_id: wsId,
+        title: value.title || "Canvas",
+        scene_json: value.scene_json || {
+          type: "excalidraw",
+          version: 2,
+          source: "openagents",
+          elements: [],
+          appState: { viewBackgroundColor: "#ffffff" },
+          files: {},
+        },
+        updated_at: new Date().toISOString(),
+        remote_rev: 1,
+      };
+      setCanvases((prev) =>
+        prev.some((c) => c.id === row.id)
+          ? prev.map((c) =>
+              c.id === row.id
+                ? {
+                    ...row,
+                    remote_rev: (c.remote_rev || 0) + 1,
+                  }
+                : c
+            )
+          : [...prev, row]
+      );
+      setActiveCanvasId(row.id);
+      setEditorTarget({ type: "canvas" });
+      const tid = activeThreadIdRef.current;
+      if (tid) {
+        setThreads((prev) =>
+          prev.map((t) =>
+            t.id === tid ? { ...t, active_canvas_id: row.id } : t
+          )
+        );
+      }
+    },
+    []
+  );
+
+  const applyLiveCanvasScene = useCallback(
+    (scene_json: Record<string, unknown>, canvasId?: string) => {
+      const id = (canvasId || activeCanvasIdRef.current || "").trim();
+      if (!id) return;
+      const now = new Date().toISOString();
+      setCanvases((prev) => {
+        const exists = prev.some((c) => c.id === id);
+        if (!exists) {
+          return [
+            ...prev,
+            {
+              id,
+              workspace_id: workspaceRef.current?.id || "",
+              title: "Canvas",
+              scene_json,
+              updated_at: now,
+              remote_rev: 1,
+            },
+          ];
+        }
+        return prev.map((c) =>
+          c.id === id
+            ? {
+                ...c,
+                scene_json,
+                updated_at: now,
+                remote_rev: (c.remote_rev || 0) + 1,
+              }
+            : c
+        );
+      });
+      setActiveCanvasId(id);
+      setEditorTarget({ type: "canvas" });
+    },
+    []
+  );
+
+  const updateCanvasScene = useCallback(
+    async (id: string, scene_json: Record<string, unknown>) => {
+      // Local autosave — do not bump remote_rev (avoids remounting Excalidraw).
+      setCanvases((prev) =>
+        prev.map((c) =>
+          c.id === id
+            ? { ...c, scene_json, updated_at: new Date().toISOString() }
+            : c
+        )
+      );
+      try {
+        await api(`/api/canvases/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ scene_json }),
+        });
+      } catch (err) {
+        console.error("Failed to save canvas:", err);
+      }
+    },
+    []
+  );
+
   const refreshAll = useCallback(async () => {
     // Full-page "Loading workspace…" unmounts ChatPane and kills live stream UI.
     // Only show it on the first bootstrap (or after sign-out).
@@ -1126,6 +1272,13 @@ export function AppProvider({
       const docs = await api<Document[]>(`/api/workspaces/${ws.id}/documents`);
       const ths = await api<Thread[]>(`/api/workspaces/${ws.id}/threads`);
       setDocuments(docs);
+      try {
+        const canvasRows = await api<Canvas[]>(`/api/workspaces/${ws.id}/canvases`);
+        setCanvases(canvasRows);
+      } catch (err) {
+        console.error("Failed to load canvases:", err);
+        setCanvases([]);
+      }
       setThreads(
         sortThreadsByRecent(ths.filter((t) => threadMatchesKind(t, agentKind)))
       );
@@ -1169,8 +1322,10 @@ export function AppProvider({
         : undefined;
       // Only load the thread's linked doc — never fall back to another document.
       const docId = thread?.active_document_id ?? null;
+      const canvasId = thread?.active_canvas_id ?? null;
       setActiveThreadId(thread?.id ?? null);
       setActiveDocumentId(docId);
+      setActiveCanvasId(canvasId);
       setEditorTarget({ type: "document" });
       if (!docId) setSuggestions([]);
 
@@ -1191,6 +1346,19 @@ export function AppProvider({
           setSuggestions(rows);
         } catch (err) {
           console.error("Failed to load document for initial thread:", err);
+        }
+      }
+      if (canvasId) {
+        try {
+          const canvas = await api<Canvas>(`/api/canvases/${canvasId}`);
+          setCanvases((prev) => {
+            const exists = prev.some((c) => c.id === canvas.id);
+            return exists
+              ? prev.map((c) => (c.id === canvas.id ? canvas : c))
+              : [...prev, canvas];
+          });
+        } catch (err) {
+          console.error("Failed to load canvas for initial thread:", err);
         }
       }
       hasBootstrappedRef.current = true;
@@ -1245,6 +1413,27 @@ export function AppProvider({
     void refreshSuggestions();
   }, [refreshSuggestions]);
 
+  const loadCanvasForThread = useCallback(async (canvasId: string | null | undefined) => {
+    if (!canvasId) {
+      activeCanvasIdRef.current = null;
+      setActiveCanvasId(null);
+      return;
+    }
+    activeCanvasIdRef.current = canvasId;
+    setActiveCanvasId(canvasId);
+    try {
+      const canvas = await api<Canvas>(`/api/canvases/${canvasId}`);
+      setCanvases((prev) => {
+        const exists = prev.some((c) => c.id === canvas.id);
+        return exists
+          ? prev.map((c) => (c.id === canvas.id ? canvas : c))
+          : [...prev, canvas];
+      });
+    } catch (err) {
+      console.error("Failed to load canvas for thread:", err);
+    }
+  }, []);
+
   const loadDocumentForThread = useCallback(async (docId: string | null | undefined) => {
     if (!docId) {
       activeDocumentIdRef.current = null;
@@ -1283,10 +1472,13 @@ export function AppProvider({
       setEditorTarget({ type: "document" });
       const thread = threads.find((t) => t.id === id);
       const docId = thread?.active_document_id ?? null;
+      const canvasId = thread?.active_canvas_id ?? null;
       // Switch document immediately so the previous chat's content doesn't linger.
       // No linked doc → clear the editor (do not keep showing another thread's document).
       activeDocumentIdRef.current = docId;
       setActiveDocumentId(docId);
+      activeCanvasIdRef.current = canvasId;
+      setActiveCanvasId(canvasId);
       if (!docId) setSuggestions([]);
 
       // If this chat's agent was deleted, fall back to Auto Agent and persist.
@@ -1310,7 +1502,10 @@ export function AppProvider({
 
       try {
         const msgsPromise = api<ApiMessage[]>(`/api/threads/${id}/messages`);
-        await loadDocumentForThread(docId);
+        await Promise.all([
+          loadDocumentForThread(docId),
+          loadCanvasForThread(canvasId),
+        ]);
         const msgs = await msgsPromise;
         if (activeThreadIdRef.current !== id) return;
         setMessages(msgs.map(mapApiMessage));
@@ -1320,7 +1515,7 @@ export function AppProvider({
         }
       }
     },
-    [threads, agents, loadDocumentForThread]
+    [threads, agents, loadDocumentForThread, loadCanvasForThread]
   );
 
   // Heal active thread after agents load (or after a delete) if its agent is gone.
@@ -1358,6 +1553,7 @@ export function AppProvider({
     onNewChatRef.current?.();
     activeThreadIdRef.current = null;
     activeDocumentIdRef.current = null;
+    activeCanvasIdRef.current = null;
     setChatsLibraryOpenState(false);
     setSidebarTabState("chats");
     setActiveThreadId(null);
@@ -1365,6 +1561,7 @@ export function AppProvider({
     setMessages([]);
     setQuotedSelectionState(null);
     setActiveDocumentId(null);
+    setActiveCanvasId(null);
     setSuggestions([]);
     setEditorTarget({ type: "document" });
   }, []);
@@ -1404,7 +1601,10 @@ export function AppProvider({
     setPreferredModel(model);
     setEditorTarget({ type: "document" });
     // Same path as setActiveThread so Artifacts picks up the new document immediately.
-    await loadDocumentForThread(thread.active_document_id);
+    await Promise.all([
+      loadDocumentForThread(thread.active_document_id),
+      loadCanvasForThread(thread.active_canvas_id),
+    ]);
     return thread;
   }, [
     workspace,
@@ -1414,6 +1614,7 @@ export function AppProvider({
     agents,
     models,
     loadDocumentForThread,
+    loadCanvasForThread,
     agentKind,
   ]);
 
@@ -2114,6 +2315,7 @@ export function AppProvider({
     () => ({
       workspace,
       documents,
+      canvases,
       workspaceFiles,
       workspaceAssets,
       workspaceUploads,
@@ -2121,6 +2323,7 @@ export function AppProvider({
       threads,
       activeThreadId,
       activeDocumentId,
+      activeCanvasId,
       editorTarget,
       setEditorTarget,
       sidebarTab,
@@ -2166,6 +2369,7 @@ export function AppProvider({
       setActiveThread,
       setActiveDocument,
       updateDocumentContent,
+      updateCanvasScene,
       updatePersona,
       updateWorkspaceFile,
       refreshWorkspaceFiles,
@@ -2192,6 +2396,8 @@ export function AppProvider({
       ingestLiveSuggestion,
       ingestDocumentCreated,
       applyLiveDocumentContent,
+      ingestCanvasCreated,
+      applyLiveCanvasScene,
       apiUrl: API_URL,
       userId,
       agentKind,
@@ -2200,6 +2406,7 @@ export function AppProvider({
     [
       workspace,
       documents,
+      canvases,
       workspaceFiles,
       workspaceAssets,
       workspaceUploads,
@@ -2207,6 +2414,7 @@ export function AppProvider({
       threads,
       activeThreadId,
       activeDocumentId,
+      activeCanvasId,
       editorTarget,
       sidebarTab,
       setSidebarTab,
@@ -2251,6 +2459,7 @@ export function AppProvider({
       setActiveThread,
       setActiveDocument,
       updateDocumentContent,
+      updateCanvasScene,
       refreshWorkspaceAssets,
       refreshWorkspaceUploads,
       updatePersona,
@@ -2275,6 +2484,8 @@ export function AppProvider({
       ingestLiveSuggestion,
       ingestDocumentCreated,
       applyLiveDocumentContent,
+      ingestCanvasCreated,
+      applyLiveCanvasScene,
       userId,
       agentKind,
       agentRunPath,

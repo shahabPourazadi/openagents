@@ -3,7 +3,9 @@ slug: agent
 description: Default agent with access to all skills and MCP servers — routes across research, coding, and agent authoring as needed.
 icon: mouse-pointer-2
 uses_document: true
+uses_canvas: true
 document_template: templates/document.md
+# Auto Agent roots every library skill at runtime; diagram-design is in skills/.
 tool_groups:
   hitl: true
   firecrawl: true

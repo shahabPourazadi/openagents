@@ -46,6 +46,7 @@ import { DocumentMap } from "@/components/workspace/document-map";
 import { FileExpandButton } from "@/components/workspace/file-expand-button";
 import { InlineDiffView } from "@/components/workspace/inline-diff-view";
 import { ExportDocumentButton } from "@/components/workspace/export-document-button";
+import { CanvasEditor } from "@/components/workspace/canvas-editor";
 import { insertMermaidSlashItem } from "@/components/workspace/mermaid-editor-block";
 import { ReviewChangesDialog } from "@/components/workspace/review-changes-dialog";
 import { AssetPreview } from "@/components/workspace/asset-preview";
@@ -75,7 +76,7 @@ type EditorPaneProps = {
   collapsed?: boolean;
 };
 
-type PaneMode = "document" | "resources";
+type PaneMode = "document" | "canvas" | "resources";
 
 type ResourceItem =
   | {
@@ -501,7 +502,9 @@ function ArtifactsEditor({ onToggle, collapsed = false }: EditorPaneProps) {
     threads,
     activeThreadId,
     documents,
+    canvases,
     activeDocumentId,
+    activeCanvasId,
     workspaceFiles,
     workspaceAssets,
     workspaceUploads,
@@ -513,8 +516,12 @@ function ArtifactsEditor({ onToggle, collapsed = false }: EditorPaneProps) {
     decideSuggestion,
     acceptAllSuggestions,
     refreshThreadArtifacts,
+    updateCanvasScene,
     threadLoading,
   } = useApp();
+
+  const usesDocument = workspace?.uses_document !== false;
+  const usesCanvas = Boolean(workspace?.uses_canvas);
 
   const [paneMode, setPaneMode] = useState<PaneMode>("document");
   const [selectedResourceKey, setSelectedResourceKey] = useState<string | null>(
@@ -531,16 +538,29 @@ function ArtifactsEditor({ onToggle, collapsed = false }: EditorPaneProps) {
     () => documents.find((d) => d.id === threadDocId) ?? null,
     [documents, threadDocId]
   );
+  const threadCanvasId = thread?.active_canvas_id ?? activeCanvasId;
+  const threadCanvas = useMemo(
+    () => canvases.find((c) => c.id === threadCanvasId) ?? null,
+    [canvases, threadCanvasId]
+  );
 
   // If the thread has a document id but we don't have it loaded yet (common right
   // after createThread on a new chat), pull artifacts without requiring a sidebar click.
   useEffect(() => {
-    if (!threadDocId) return;
-    if (documents.some((d) => d.id === threadDocId)) return;
-    void refreshThreadArtifacts();
-  }, [threadDocId, documents, refreshThreadArtifacts]);
+    if (!threadDocId && !threadCanvasId) return;
+    if (threadDocId && !documents.some((d) => d.id === threadDocId)) {
+      void refreshThreadArtifacts();
+      return;
+    }
+    if (threadCanvasId && !canvases.some((c) => c.id === threadCanvasId)) {
+      void refreshThreadArtifacts();
+    }
+  }, [threadDocId, threadCanvasId, documents, canvases, refreshThreadArtifacts]);
 
-  const hasDocument = Boolean(threadDoc || threadDocId);
+  const hasDocument = Boolean(usesDocument && (threadDoc || threadDocId));
+  /** Canvas tab is available whenever the agent enables it (scene created on demand). */
+  const hasCanvas = usesCanvas;
+  const hasCanvasContent = Boolean(threadCanvas || threadCanvasId);
 
   /** Upload paths attached on messages in this thread (workspace store is global). */
   const threadUploadPaths = useMemo(() => {
@@ -765,6 +785,10 @@ function ArtifactsEditor({ onToggle, collapsed = false }: EditorPaneProps) {
       if (threadDocId) setSelectedResourceKey(`doc-${threadDocId}`);
       return;
     }
+    if (editorTarget.type === "canvas") {
+      setPaneMode("canvas");
+      return;
+    }
     if (editorTarget.type === "workspace_file") {
       const file = workspaceFiles.find((f) => f.id === editorTarget.id);
       if (!file) return;
@@ -776,15 +800,31 @@ function ArtifactsEditor({ onToggle, collapsed = false }: EditorPaneProps) {
   }, [editorTarget, workspaceFiles, threadDocId]);
 
   useEffect(() => {
-    if (!hasDocument && hasResources && paneMode === "document") {
-      setPaneMode("resources");
+    if (paneMode === "document" && !hasDocument) {
+      if (hasCanvas) setPaneMode("canvas");
+      else if (hasResources) setPaneMode("resources");
+    } else if (paneMode === "canvas" && !hasCanvas) {
+      if (hasDocument) setPaneMode("document");
+      else if (hasResources) setPaneMode("resources");
     }
-  }, [hasDocument, hasResources, paneMode]);
+  }, [hasDocument, hasCanvas, hasResources, paneMode]);
+
+  // Prefer canvas tab when the agent first creates/updates a board.
+  useEffect(() => {
+    if (editorTarget.type === "canvas" && hasCanvas) {
+      setPaneMode("canvas");
+    }
+  }, [editorTarget, hasCanvas]);
 
   const openDocumentTab = () => {
     setPaneMode("document");
     setEditorTarget({ type: "document" });
     if (threadDocId) setSelectedResourceKey(`doc-${threadDocId}`);
+  };
+
+  const openCanvasTab = () => {
+    setPaneMode("canvas");
+    setEditorTarget({ type: "canvas" });
   };
 
   /** Local tab only — do not sync editorTarget (that was bouncing back to ID). */
@@ -809,7 +849,7 @@ function ArtifactsEditor({ onToggle, collapsed = false }: EditorPaneProps) {
     return <DocumentPaneSkeleton onToggle={onToggle} />;
   }
 
-  if (!hasDocument && !hasResources) {
+  if (!hasDocument && !hasCanvas && !hasResources && !usesCanvas) {
     return (
       <div className="flex h-full flex-col">
         <div className="flex h-12 shrink-0 items-center justify-end px-2">
@@ -823,6 +863,7 @@ function ArtifactsEditor({ onToggle, collapsed = false }: EditorPaneProps) {
   }
 
   const showingDocument = paneMode === "document" && hasDocument;
+  const showingCanvas = paneMode === "canvas" && hasCanvas;
   const activeFile =
     selectedResource?.kind === "workspace_file"
       ? (workspaceFiles.find((f) => f.id === selectedResource.id) ?? null)
@@ -839,6 +880,11 @@ function ArtifactsEditor({ onToggle, collapsed = false }: EditorPaneProps) {
           {hasDocument ? (
             <TabButton active={showingDocument} onClick={openDocumentTab}>
               Document
+            </TabButton>
+          ) : null}
+          {hasCanvas ? (
+            <TabButton active={showingCanvas} onClick={openCanvasTab}>
+              Canvas
             </TabButton>
           ) : null}
           {hasResources ? (
@@ -874,6 +920,23 @@ function ArtifactsEditor({ onToggle, collapsed = false }: EditorPaneProps) {
       ) : showingDocument && threadDocId ? (
         <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
           Loading document…
+        </div>
+      ) : showingCanvas && threadCanvas ? (
+        <CanvasEditor
+          canvas={threadCanvas}
+          collapsed={collapsed}
+          onSceneChange={(scene_json) => {
+            void updateCanvasScene(threadCanvas.id, scene_json);
+          }}
+        />
+      ) : showingCanvas && threadCanvasId ? (
+        <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+          Loading canvas…
+        </div>
+      ) : showingCanvas && !hasCanvasContent ? (
+        <div className="flex flex-1 items-center justify-center px-6 text-center text-sm text-muted-foreground">
+          Ask the agent to draw on the canvas — architecture, flowcharts,
+          comparisons, or brainstorms.
         </div>
       ) : paneMode === "resources" ? (
         <div className="flex min-h-0 flex-1">

@@ -136,6 +136,7 @@ export function AgentDialog({
   const [description, setDescription] = useState("");
   const [icon, setIcon] = useState<AgentIconId>(DEFAULT_AGENT_ICON);
   const [usesDocument, setUsesDocument] = useState(false);
+  const [usesCanvas, setUsesCanvas] = useState(false);
   const [source, setSource] = useState<"builtin" | "user">("user");
   const [predefinedSkillSlugs, setPredefinedSkillSlugs] = useState<string[]>([]);
   const [mcpServerIds, setMcpServerIds] = useState<string[]>([]);
@@ -210,6 +211,7 @@ export function AgentDialog({
         detail.icon && isAgentIconId(detail.icon) ? detail.icon : DEFAULT_AGENT_ICON
       );
       setUsesDocument(Boolean(detail.uses_document));
+      setUsesCanvas(Boolean(detail.uses_canvas));
       setSource(detail.source === "builtin" ? "builtin" : "user");
       setPredefinedSkillSlugs(
         Array.isArray(detail.predefined_skill_slugs)
@@ -242,6 +244,7 @@ export function AgentDialog({
       setDescription("");
       setIcon(DEFAULT_AGENT_ICON);
       setUsesDocument(false);
+      setUsesCanvas(false);
       setSource("user");
       setPredefinedSkillSlugs([]);
       setMcpServerIds([]);
@@ -371,6 +374,7 @@ export function AgentDialog({
           description: description.trim(),
           icon,
           uses_document: usesDocument,
+          uses_canvas: usesCanvas,
           agent_md: instructions,
           soul_md: soulMd.trim(),
           skills: skillsPayload,
@@ -395,6 +399,7 @@ export function AgentDialog({
         description: description.trim(),
         icon,
         uses_document: usesDocument,
+        uses_canvas: usesCanvas,
         agent_md: instructions,
         soul_md: soulMd.trim(),
         skills: skillsPayload,
@@ -574,6 +579,23 @@ export function AgentDialog({
                         </span>
                       </label>
 
+                      <label className="flex cursor-pointer items-start gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          className="mt-0.5 size-4 rounded border-input"
+                          checked={usesCanvas}
+                          onChange={(e) => setUsesCanvas(e.target.checked)}
+                          disabled={busy}
+                        />
+                        <span>
+                          <span className="font-medium">Excalidraw canvas</span>
+                          <span className="block text-muted-foreground">
+                            Show a live whiteboard in the Artifacts pane for
+                            flowcharts, architecture, and brainstorming.
+                          </span>
+                        </span>
+                      </label>
+
                       <div className="flex flex-col gap-1.5">
                         <div className="flex items-center justify-between gap-2">
                           <label
@@ -651,6 +673,12 @@ export function AgentDialog({
                           Document editor
                         </span>
                         <span>{usesDocument ? "On" : "Off"}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-muted-foreground">
+                          Excalidraw canvas
+                        </span>
+                        <span>{usesCanvas ? "On" : "Off"}</span>
                       </div>
                       {agentMd.trim() ? (
                         <div className="flex flex-col gap-1.5 pt-1">

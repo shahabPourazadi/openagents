@@ -1054,6 +1054,8 @@ export function ChatPane({
     ingestLiveSuggestion,
     ingestDocumentCreated,
     applyLiveDocumentContent,
+    ingestCanvasCreated,
+    applyLiveCanvasScene,
     refreshThreadArtifacts,
     quotedSelection,
     clearQuotedSelection,
@@ -1509,6 +1511,38 @@ export function ChatPane({
               // If the document editor is closed, open it so the user sees the diff.
               if (documentCollapsedRef.current) {
                 setEditorTarget({ type: "document" });
+                onOpenDocumentRef.current?.();
+              }
+            } else if (
+              evt.type === "CUSTOM" &&
+              evt.name === "canvas_created" &&
+              evt.value
+            ) {
+              ingestCanvasCreated(
+                evt.value as {
+                  id?: string;
+                  title?: string;
+                  scene_json?: Record<string, unknown>;
+                }
+              );
+              setEditorTarget({ type: "canvas" });
+              if (documentCollapsedRef.current) {
+                onOpenDocumentRef.current?.();
+              }
+            } else if (
+              evt.type === "CUSTOM" &&
+              evt.name === "canvas_updated" &&
+              evt.value
+            ) {
+              const updated = evt.value as {
+                id?: string;
+                scene_json?: Record<string, unknown>;
+              };
+              if (updated.scene_json && typeof updated.scene_json === "object") {
+                applyLiveCanvasScene(updated.scene_json, updated.id);
+              }
+              setEditorTarget({ type: "canvas" });
+              if (documentCollapsedRef.current) {
                 onOpenDocumentRef.current?.();
               }
             } else if (
