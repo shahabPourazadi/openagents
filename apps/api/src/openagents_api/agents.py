@@ -38,6 +38,7 @@ class AgentManifest(BaseModel):
     description: str = ""
     icon: str = ""
     uses_document: bool = True
+    uses_canvas: bool = False
     document_template: str = "templates/document.md"
     tool_groups: dict[str, bool] | None = None
     default_model: str | None = None
@@ -236,6 +237,9 @@ def load_agent(slug: str) -> LoadedAgent:
         if tpl.is_file():
             document_template_md = tpl.read_text(encoding="utf-8")
 
+    from openagents_api.skills_library import normalize_skill_slugs
+
+    predefined_raw = raw.get("predefined_skills") or raw.get("predefined_skill_slugs") or []
     return LoadedAgent(
         slug=slug,
         root=root,
@@ -246,6 +250,7 @@ def load_agent(slug: str) -> LoadedAgent:
         skills=_load_skills(root / "skills"),
         document_template_md=document_template_md,
         source="builtin",
+        predefined_skill_slugs=normalize_skill_slugs(predefined_raw),
     )
 
 
@@ -314,6 +319,7 @@ def materialize_user_agent_files(
     system_prompt: str,
     document_template_md: str,
     skills: list[AgentSkill],
+    uses_canvas: bool = False,
 ) -> Path:
     """Write a user agent to the temp cache and return its root directory."""
     root = user_agent_cache_root(owner_id, slug)
@@ -327,6 +333,7 @@ def materialize_user_agent_files(
         "description": description or "",
         "icon": icon or "",
         "uses_document": bool(uses_document),
+        "uses_canvas": bool(uses_canvas),
     }
     if uses_document:
         manifest["document_template"] = "templates/document.md"
@@ -365,6 +372,7 @@ def loaded_agent_from_user_row(row: Any) -> LoadedAgent:
         description=row.description or "",
         icon=row.icon or "",
         uses_document=bool(row.uses_document),
+        uses_canvas=bool(getattr(row, "uses_canvas", False)),
         agent_md=agent_md,
         soul_md=row.soul_md or "",
         system_prompt=row.system_prompt or "",
@@ -377,6 +385,7 @@ def loaded_agent_from_user_row(row: Any) -> LoadedAgent:
         description=row.description or "",
         icon=row.icon or "",
         uses_document=bool(row.uses_document),
+        uses_canvas=bool(getattr(row, "uses_canvas", False)),
         document_template="templates/document.md" if row.uses_document else "",
     )
     from openagents_api.mcp_library import normalize_mcp_server_ids
@@ -578,6 +587,7 @@ def read_agent_dir_from_workspace(workspace_dir: str | Path, slug: str) -> dict[
         "description": manifest.description or "",
         "icon": manifest.icon or "",
         "uses_document": bool(manifest.uses_document),
+        "uses_canvas": bool(getattr(manifest, "uses_canvas", False)),
         "agent_md": agent_md,
         "soul_md": _read_text(root / "soul.md"),
         "system_prompt": _read_text(root / "system_prompt.md"),

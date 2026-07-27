@@ -619,6 +619,12 @@ class OpenAgentsDeepDeps(DeepAgentDeps):
     document_md: str = ""
     document_path: str = ""
     uses_document: bool = False
+    canvas_id: uuid.UUID | None = None
+    canvas_scene: dict[str, Any] | None = None
+    canvas_title: str = "Canvas"
+    uses_canvas: bool = False
+    canvas_destructive_confirmed: bool = False
+    preferred_artifact_pane: str | None = None
     openrouter_api_key: str = ""
     model: str = "openrouter:z-ai/glm-5.2"
     workspace_dir: str = ""
@@ -711,6 +717,14 @@ def build_deep_deps(
         document_md=state.document_md,
         document_path=state.document_path,
         uses_document=bool(getattr(state, "uses_document", False)),
+        canvas_id=getattr(state, "canvas_id", None),
+        canvas_scene=getattr(state, "canvas_scene", None),
+        canvas_title=getattr(state, "canvas_title", None) or "Canvas",
+        uses_canvas=bool(getattr(state, "uses_canvas", False)),
+        canvas_destructive_confirmed=bool(
+            getattr(state, "canvas_destructive_confirmed", False)
+        ),
+        preferred_artifact_pane=getattr(state, "preferred_artifact_pane", None),
         openrouter_api_key=state.openrouter_api_key,
         model=state.model,
         workspace_dir=state.workspace_dir,
@@ -766,6 +780,16 @@ DEEP_SYSTEM_INSTRUCTIONS = (
 )
 
 
+def openagents_run_tools(*, hitl: bool = True, uses_canvas: bool = False) -> list[Any]:
+    """HITL (+ optional canvas) tools registered for a deep agent run."""
+    from openagents_api.canvas_tools import OPENAGENTS_CANVAS_TOOLS
+
+    tools: list[Any] = list(OPENAGENTS_HITL_TOOLS) if hitl else []
+    if hitl and uses_canvas:
+        tools.extend(OPENAGENTS_CANVAS_TOOLS)
+    return tools
+
+
 def build_deep_agent(
     model: str | None = None,
     *,
@@ -779,6 +803,8 @@ def build_deep_agent(
     agent_slug: str | None = None,
     agent_source: str | None = None,
     user_mcp_configs: list[McpServerConfig] | None = None,
+    uses_canvas: bool = False,
+    uses_document: bool = True,
 ) -> Agent[OpenAgentsDeepDeps, str]:
     """Build a pydantic-deep agent with OpenAgents HITL tools + shields.
 
@@ -786,6 +812,7 @@ def build_deep_agent(
     (LocalBackend or DockerSandbox).
     """
     from openagents_api.agent_runtime import AgentSafetyConfig
+    from openagents_api.artifact_pane_policy import ARTIFACT_PANE_INSTRUCTIONS
     from openagents_api.company_config import DEFAULT_TOOL_GROUPS, merge_tool_groups
 
     settings = get_settings()
@@ -793,6 +820,15 @@ def build_deep_agent(
     resolved_model = model or settings.default_model
     supports_vision = model_supports_vision(resolved_model)
     base_instructions = (system_prompt or "").strip() or DEEP_SYSTEM_INSTRUCTIONS
+    if uses_canvas and uses_document:
+        base_instructions = f"{base_instructions.rstrip()}\n\n{ARTIFACT_PANE_INSTRUCTIONS}"
+    elif uses_canvas:
+        base_instructions = (
+            f"{base_instructions.rstrip()}\n\n"
+            "This agent has an Excalidraw Canvas in the Artifacts pane. "
+            "Use canvas_* tools for diagrams, architecture, and brainstorming. "
+            "Never clear or fully replace the canvas without ask_user confirmation."
+        )
     instructions = apply_attachment_workflow_for_model(
         base_instructions, supports_vision=supports_vision
     )
@@ -800,7 +836,10 @@ def build_deep_agent(
     resolved_slug = (agent_slug or pack_slug or "").strip()
     resolved_source = (agent_source or pack_source or "").strip()
 
-    tools: list[Any] = list(OPENAGENTS_HITL_TOOLS) if groups.get("hitl", True) else []
+    tools: list[Any] = openagents_run_tools(
+        hitl=groups.get("hitl", True),
+        uses_canvas=uses_canvas,
+    )
     if resolved_slug in {"agent-builder", "pack-builder"}:
         from openagents_api.agent_builder_tools import AGENT_BUILDER_TOOLS
 

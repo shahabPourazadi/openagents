@@ -112,12 +112,12 @@ See [docs/agents.md](docs/agents.md), [docs/skills.md](docs/skills.md), and [doc
 
 ### Built-in agents
 
-| Agent | Slug | Document pane |
-|------|------|----------------|
-| Agent | `agent` | Yes — generalist; loads specialized skills on demand |
-| Research Assistant | `research-assistant` | Yes — notes with Accept/Reject suggestions |
-| Coding Assistant | `coding-assistant` | No — chat + sandbox file edits |
-| Agent Builder | `agent-builder` | No — interviews you and registers a new agent |
+| Agent | Slug | Document | Canvas |
+|------|------|----------|--------|
+| Agent | `agent` | Yes | Yes |
+| Research Assistant | `research-assistant` | Yes | Yes |
+| Coding Assistant | `coding-assistant` | No | No |
+| Agent Builder | `agent-builder` | No | No |
 
 ## Key features
 
@@ -128,6 +128,7 @@ OpenAgents is an **agent workspace** — the product layer around a deep agent h
 | 💬 | **AG-UI chat** | Streaming agent UI over SSE — text, thinking, tools, and media |
 | 🧩 | **Agents** | Folder- or UI-defined specialists (`agent.md`, skills, MCP, optional document) |
 | 📝 | **Document HITL** | Markdown editor with `suggest_edit` Accept/Reject and clarifying questions |
+| 🎨 | **Excalidraw canvas** | Live Artifacts whiteboard for architecture, flowcharts, comparisons, brainstorms |
 | 🔧 | **Tool-calling** | File read/write/edit, shell (sandbox), glob/grep, uploads, document parse |
 | 🤝 | **Subagents + plan** | Deep builtins for plan mode, todos, and subagent delegation when enabled |
 | 🧠 | **Persistent memory** | `MEMORY.md` / persona files seeded per workspace and injected into runs |

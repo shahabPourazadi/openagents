@@ -13,6 +13,7 @@ from openagents_api.auth import AuthUser, require_active_user
 from openagents_api.config import Settings, get_settings
 from openagents_api.db import get_session
 from openagents_api.models import (
+    Canvas,
     Document,
     Message,
     Thread,
@@ -35,6 +36,9 @@ from openagents_api.agents import (
     validate_agent_slug,
 )
 from openagents_api.schemas import (
+    CanvasCreate,
+    CanvasOut,
+    CanvasUpdate,
     DocumentCreate,
     DocumentOut,
     DocumentUpdate,
@@ -115,6 +119,7 @@ def _agent_out_from_loaded(pack, *, detail: bool = False) -> AgentOut:
         description=pack.manifest.description or "",
         icon=pack.manifest.icon or "",
         uses_document=pack.manifest.uses_document,
+        uses_canvas=bool(getattr(pack.manifest, "uses_canvas", False)),
         default_model=pack.manifest.default_model,
         source=getattr(pack, "source", "builtin") or "builtin",
         agent_md=pack.agent_md if detail else None,
@@ -166,6 +171,7 @@ def _agent_out_from_user_row(row: UserAgent, *, detail: bool = False) -> AgentOu
         description=row.description or "",
         icon=row.icon or "",
         uses_document=bool(row.uses_document),
+        uses_canvas=bool(getattr(row, "uses_canvas", False)),
         default_model=None,
         source="user",
         agent_md=row.agent_md if detail else None,
@@ -181,9 +187,11 @@ def _agent_out_from_user_row(row: UserAgent, *, detail: bool = False) -> AgentOu
 async def _workspace_out(session: AsyncSession, ws: Workspace) -> WorkspaceOut:
     slug = (getattr(ws, "agent_slug", None) or DEFAULT_AGENT_SLUG).strip() or DEFAULT_AGENT_SLUG
     uses_document = True
+    uses_canvas = False
     try:
         pack = await resolve_agent(session, slug, ws.owner_id)
         uses_document = pack.manifest.uses_document
+        uses_canvas = bool(getattr(pack.manifest, "uses_canvas", False))
         slug = pack.slug
     except AgentError:
         pass
@@ -193,6 +201,7 @@ async def _workspace_out(session: AsyncSession, ws: Workspace) -> WorkspaceOut:
         owner_id=ws.owner_id,
         agent_slug=slug,
         uses_document=uses_document,
+        uses_canvas=uses_canvas,
         agent_md=ws.agent_md,
         soul_md=ws.soul_md,
         created_at=ws.created_at,
@@ -318,6 +327,7 @@ async def list_packs(
                     description=m.description,
                     icon=m.icon,
                     uses_document=m.uses_document,
+                    uses_canvas=bool(getattr(m, "uses_canvas", False)),
                     default_model=m.default_model,
                     source="builtin",
                 )
@@ -362,6 +372,7 @@ async def create_pack(
         description=body.description or "",
         icon=body.icon or "",
         uses_document=body.uses_document,
+        uses_canvas=bool(body.uses_canvas),
         document_template_md=body.document_template_md or "",
         agent_md=agent_md,
         soul_md=body.soul_md or "",
@@ -439,6 +450,8 @@ async def update_pack(
         row.icon = body.icon
     if body.uses_document is not None:
         row.uses_document = body.uses_document
+    if body.uses_canvas is not None:
+        row.uses_canvas = body.uses_canvas
     if body.document_template_md is not None:
         row.document_template_md = body.document_template_md
     if body.agent_md is not None:
@@ -510,6 +523,7 @@ async def duplicate_pack(
         system_prompt = source.system_prompt
         document_template_md = source.document_template_md
         uses_document = source.manifest.uses_document
+        uses_canvas = bool(getattr(source.manifest, "uses_canvas", False))
         description = source.manifest.description or ""
         icon = source.manifest.icon or ""
         skills = [
@@ -533,6 +547,7 @@ async def duplicate_pack(
         system_prompt = src_row.system_prompt or ""
         document_template_md = src_row.document_template_md or ""
         uses_document = bool(src_row.uses_document)
+        uses_canvas = bool(getattr(src_row, "uses_canvas", False))
         description = src_row.description or ""
         icon = src_row.icon or ""
         skills = src_row.skills_json if isinstance(src_row.skills_json, list) else []
@@ -560,6 +575,7 @@ async def duplicate_pack(
         description=description,
         icon=icon,
         uses_document=uses_document,
+        uses_canvas=uses_canvas,
         document_template_md=document_template_md,
         agent_md=agent_md,
         soul_md=soul_md,
@@ -1333,6 +1349,80 @@ async def get_document(
     return doc
 
 
+def _default_canvas_scene() -> dict:
+    return {
+        "type": "excalidraw",
+        "version": 2,
+        "source": "openagents",
+        "elements": [],
+        "appState": {"viewBackgroundColor": "#ffffff"},
+        "files": {},
+    }
+
+
+@router.get("/workspaces/{workspace_id}/canvases", response_model=list[CanvasOut])
+async def list_canvases(
+    workspace_id: uuid.UUID,
+    user: AuthUser = Depends(require_active_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[Canvas]:
+    await _owned_workspace(session, workspace_id, user)
+    result = await session.execute(select(Canvas).where(Canvas.workspace_id == workspace_id))
+    return list(result.scalars())
+
+
+@router.post("/workspaces/{workspace_id}/canvases", response_model=CanvasOut)
+async def create_canvas(
+    workspace_id: uuid.UUID,
+    body: CanvasCreate,
+    user: AuthUser = Depends(require_active_user),
+    session: AsyncSession = Depends(get_session),
+) -> Canvas:
+    await _owned_workspace(session, workspace_id, user)
+    canvas = Canvas(
+        workspace_id=workspace_id,
+        title=body.title,
+        scene_json=body.scene_json if body.scene_json is not None else _default_canvas_scene(),
+    )
+    session.add(canvas)
+    await session.commit()
+    await session.refresh(canvas)
+    return canvas
+
+
+@router.get("/canvases/{canvas_id}", response_model=CanvasOut)
+async def get_canvas(
+    canvas_id: uuid.UUID,
+    user: AuthUser = Depends(require_active_user),
+    session: AsyncSession = Depends(get_session),
+) -> Canvas:
+    canvas = await session.get(Canvas, canvas_id)
+    if not canvas:
+        raise HTTPException(status_code=404, detail="Canvas not found")
+    await _owned_workspace(session, canvas.workspace_id, user)
+    return canvas
+
+
+@router.patch("/canvases/{canvas_id}", response_model=CanvasOut)
+async def update_canvas(
+    canvas_id: uuid.UUID,
+    body: CanvasUpdate,
+    user: AuthUser = Depends(require_active_user),
+    session: AsyncSession = Depends(get_session),
+) -> Canvas:
+    canvas = await session.get(Canvas, canvas_id)
+    if not canvas:
+        raise HTTPException(status_code=404, detail="Canvas not found")
+    await _owned_workspace(session, canvas.workspace_id, user)
+    if body.title is not None:
+        canvas.title = body.title
+    if body.scene_json is not None:
+        canvas.scene_json = body.scene_json
+    await session.commit()
+    await session.refresh(canvas)
+    return canvas
+
+
 @router.patch("/documents/{document_id}", response_model=DocumentOut)
 async def update_document(
     document_id: uuid.UUID,
@@ -1390,8 +1480,9 @@ async def create_thread(
     except AgentError:
         pack = try_load_agent(DEFAULT_AGENT_SLUG)
     agent_slug = pack.slug or DEFAULT_AGENT_SLUG
-    # Documents are created on demand — new chats start without an artifact.
+    # Documents/canvases are created on demand — new chats start without either.
     doc_id = body.active_document_id
+    canvas_id = body.active_canvas_id
     kind = (body.agent_kind or "deep").strip().lower()
     if kind not in ("classic", "deep"):
         raise HTTPException(
@@ -1414,6 +1505,7 @@ async def create_thread(
         agent_slug=agent_slug,
         agent_kind=kind,
         active_document_id=doc_id,
+        active_canvas_id=canvas_id,
     )
     session.add(thread)
     await session.commit()
@@ -1448,6 +1540,8 @@ async def update_thread(
         thread.agent_slug = pack.slug or DEFAULT_AGENT_SLUG
     if body.active_document_id is not None:
         thread.active_document_id = body.active_document_id
+    if body.active_canvas_id is not None:
+        thread.active_canvas_id = body.active_canvas_id
     await session.commit()
     await session.refresh(thread)
     return thread

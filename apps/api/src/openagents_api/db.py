@@ -107,6 +107,10 @@ async def init_db() -> None:
             await conn.run_sync(
                 _ensure_column, "user_agents", "mcp_server_ids", "JSON"
             )
+            await conn.run_sync(
+                _ensure_column, "user_agents", "uses_canvas", "BOOLEAN DEFAULT FALSE"
+            )
+            await conn.run_sync(_ensure_active_canvas_id_column)
     except Exception:
         _log.exception(
             "Database unavailable during init_db (url=%s). "
@@ -140,6 +144,12 @@ def _ensure_column(sync_conn, table: str, column: str, sql_type: str) -> None:  
     if column in cols:
         return
     sync_conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {sql_type}"))
+
+
+def _ensure_active_canvas_id_column(sync_conn) -> None:  # type: ignore[no-untyped-def]
+    """Add threads.active_canvas_id with a dialect-appropriate UUID column type."""
+    sql_type = "CHAR(32)" if sync_conn.dialect.name == "sqlite" else "UUID"
+    _ensure_column(sync_conn, "threads", "active_canvas_id", sql_type)
 
 
 def _migrate_pack_to_agent_schema(sync_conn) -> None:  # type: ignore[no-untyped-def]

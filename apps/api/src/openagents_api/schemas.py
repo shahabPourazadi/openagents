@@ -38,6 +38,7 @@ class WorkspaceOut(BaseModel):
     owner_id: str
     agent_slug: str = "agent"
     uses_document: bool = True
+    uses_canvas: bool = False
     agent_md: str | None = None
     soul_md: str | None = None
     created_at: datetime
@@ -90,6 +91,7 @@ class AgentOut(BaseModel):
     description: str = ""
     icon: str = ""
     uses_document: bool = True
+    uses_canvas: bool = False
     default_model: str | None = None
     source: str = "builtin"  # builtin | user
     agent_md: str | None = None
@@ -108,6 +110,7 @@ class AgentCreate(BaseModel):
     description: str = ""
     icon: str = ""
     uses_document: bool = True
+    uses_canvas: bool = False
     document_template_md: str = ""
     agent_md: str = ""
     soul_md: str = ""
@@ -123,6 +126,7 @@ class AgentUpdate(BaseModel):
     description: str | None = None
     icon: str | None = None
     uses_document: bool | None = None
+    uses_canvas: bool | None = None
     document_template_md: str | None = None
     agent_md: str | None = None
     soul_md: str | None = None
@@ -139,6 +143,7 @@ class AgentEnhanceAgentMd(BaseModel):
     name: str = ""
     description: str = ""
     uses_document: bool = False
+    uses_canvas: bool = False
 
 
 class AgentEnhanceAgentMdOut(BaseModel):
@@ -169,11 +174,32 @@ class DocumentUpdate(BaseModel):
     path: str | None = None
 
 
+class CanvasCreate(BaseModel):
+    title: str = "Canvas"
+    scene_json: dict | None = None
+
+
+class CanvasOut(BaseModel):
+    id: UUID
+    workspace_id: UUID
+    title: str
+    scene_json: dict
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class CanvasUpdate(BaseModel):
+    title: str | None = None
+    scene_json: dict | None = None
+
+
 class ThreadCreate(BaseModel):
     title: str = "New chat"
     model: str | None = None
     agent_slug: str | None = None
     active_document_id: UUID | None = None
+    active_canvas_id: UUID | None = None
     # "deep" (default) — legacy DB rows may still say "classic".
     agent_kind: str = "deep"
 
@@ -183,6 +209,7 @@ class ThreadUpdate(BaseModel):
     model: str | None = None
     agent_slug: str | None = None
     active_document_id: UUID | None = None
+    active_canvas_id: UUID | None = None
 
 
 class ThreadOut(BaseModel):
@@ -193,6 +220,7 @@ class ThreadOut(BaseModel):
     agent_slug: str = "agent"
     agent_kind: str = "deep"
     active_document_id: UUID | None
+    active_canvas_id: UUID | None = None
     usage: dict | None = None
     updated_at: datetime
 

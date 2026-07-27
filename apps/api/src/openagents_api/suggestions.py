@@ -9,7 +9,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from openagents_api.models import Document, DocumentRevision, Suggestion
+from openagents_api.models import Canvas, Document, DocumentRevision, Suggestion
 
 
 @dataclass
@@ -47,6 +47,15 @@ class AgentRunState:
     document_path: str = ""
     # When True, suggest_edit may create an empty document on first use.
     uses_document: bool = False
+    canvas_id: uuid.UUID | None = None
+    canvas_scene: dict[str, Any] | None = None
+    canvas_title: str = "Canvas"
+    # When True, canvas_* tools may create an empty canvas on first use.
+    uses_canvas: bool = False
+    # Set after ask_user confirms a destructive clear/replace.
+    canvas_destructive_confirmed: bool = False
+    # document | canvas | None — remembered pane preference for this thread/run.
+    preferred_artifact_pane: str | None = None
     openrouter_api_key: str = ""
     model: str = "openrouter:z-ai/glm-5.2"
     workspace_dir: str = ""
@@ -348,12 +357,36 @@ async def persist_document_md(
     return doc
 
 
+async def persist_canvas_scene(
+    session: AsyncSession,
+    state: AgentRunState,
+) -> Canvas | None:
+    """Write in-memory canvas scene changes back to the Canvas row."""
+    if not state.canvas_id:
+        return None
+    canvas = await session.get(Canvas, state.canvas_id)
+    if not canvas:
+        return None
+    scene = state.canvas_scene
+    if not isinstance(scene, dict):
+        return canvas
+    if canvas.scene_json == scene:
+        return canvas
+    canvas.scene_json = scene
+    if state.canvas_title:
+        canvas.title = state.canvas_title
+    await session.commit()
+    await session.refresh(canvas)
+    return canvas
+
+
 async def persist_pending_suggestions(
     session: AsyncSession,
     state: AgentRunState,
 ) -> list[Suggestion]:
     # Always flush auto-applied markdown first (even when no review queue).
     await persist_document_md(session, state)
+    await persist_canvas_scene(session, state)
 
     if not state.document_id or not state.pending:
         return []

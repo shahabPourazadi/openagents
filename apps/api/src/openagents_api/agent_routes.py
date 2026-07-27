@@ -32,7 +32,7 @@ from openagents_api.deep_agent_builder import (
     build_deep_agent,
     build_deep_deps,
 )
-from openagents_api.models import Document, Thread, UserSettings, Workspace
+from openagents_api.models import Canvas, Document, Thread, UserSettings, Workspace
 from openagents_api.agents import (
     DEFAULT_AGENT_SLUG,
     AgentError,
@@ -368,6 +368,9 @@ async def _run_deep_agent(
     active_doc = None
     if thread.active_document_id:
         active_doc = await session.get(Document, thread.active_document_id)
+    active_canvas = None
+    if getattr(thread, "active_canvas_id", None):
+        active_canvas = await session.get(Canvas, thread.active_canvas_id)
 
     api_key = await _resolve_api_key(session, user, settings)
     if api_key:
@@ -465,6 +468,7 @@ async def _run_deep_agent(
 
     resolved_model = thread.model or pack.manifest.default_model or default_model
 
+    uses_canvas = bool(getattr(pack.manifest, "uses_canvas", False))
     state = AgentRunState(
         user_id=user.id,
         workspace_id=ws.id,
@@ -473,6 +477,14 @@ async def _run_deep_agent(
         document_md=active_doc.content_md if active_doc else "",
         document_path=active_doc.path if active_doc else "",
         uses_document=bool(pack.manifest.uses_document),
+        canvas_id=active_canvas.id if active_canvas else None,
+        canvas_scene=(
+            dict(active_canvas.scene_json)
+            if active_canvas and isinstance(active_canvas.scene_json, dict)
+            else None
+        ),
+        canvas_title=active_canvas.title if active_canvas else "Canvas",
+        uses_canvas=uses_canvas,
         openrouter_api_key=api_key,
         model=resolved_model,
         workspace_dir=workspace_dir,
@@ -529,6 +541,8 @@ async def _run_deep_agent(
             agent_slug=agent_slug,
             agent_source=getattr(pack, "source", None),
             user_mcp_configs=user_mcp_configs,
+            uses_canvas=uses_canvas,
+            uses_document=bool(pack.manifest.uses_document),
         )
         deep_deps = build_deep_deps(
             state, backend_handle=backend_handle, todos=restored_todos
@@ -558,6 +572,15 @@ async def _run_deep_agent(
                 live_md = getattr(run_deps, "document_md", None)
                 if isinstance(live_md, str):
                     state.document_md = live_md
+                live_canvas = getattr(run_deps, "canvas_scene", None)
+                if isinstance(live_canvas, dict):
+                    state.canvas_scene = live_canvas
+                live_canvas_id = getattr(run_deps, "canvas_id", None)
+                if live_canvas_id is not None:
+                    state.canvas_id = live_canvas_id
+                live_canvas_title = getattr(run_deps, "canvas_title", None)
+                if isinstance(live_canvas_title, str) and live_canvas_title.strip():
+                    state.canvas_title = live_canvas_title
                 await persist_pending_suggestions(persist_session, state)
                 try:
                     await write_back_workspace_files(

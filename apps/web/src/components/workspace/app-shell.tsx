@@ -102,6 +102,8 @@ function WorkspacePanels({
 }) {
   const { setOnNewChat, sidebarTab, chatsLibraryOpen, workspace } = useApp();
   const usesDocument = workspace?.uses_document !== false;
+  const usesCanvas = Boolean(workspace?.uses_canvas);
+  const usesArtifacts = usesDocument || usesCanvas;
   const { defaultLayout, onLayoutChanged } = useDefaultLayout({
     id: LAYOUT_ID,
     panelIds: ["chat", "right"],
@@ -201,10 +203,10 @@ function WorkspacePanels({
   }, [setOnNewChat, closeDocumentPanel]);
 
   useEffect(() => {
-    if (!usesDocument) {
+    if (!usesArtifacts) {
       closeDocumentPanel();
     }
-  }, [usesDocument, closeDocumentPanel]);
+  }, [usesArtifacts, closeDocumentPanel]);
 
   useEffect(() => {
     const id = requestAnimationFrame(() => {
@@ -229,7 +231,7 @@ function WorkspacePanels({
     middlePanel = <McpPane />;
   } else if (sidebarTab === "chats" && chatsLibraryOpen) {
     middlePanel = <ChatsPane />;
-  } else if (usesDocument) {
+  } else if (usesArtifacts) {
     middlePanel = (
       <ResizablePanelGroup
         orientation="horizontal"

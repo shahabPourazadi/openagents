@@ -41,6 +41,7 @@ class Workspace(Base):
     )
 
     documents: Mapped[list[Document]] = relationship(back_populates="workspace", cascade="all, delete-orphan")
+    canvases: Mapped[list[Canvas]] = relationship(back_populates="workspace", cascade="all, delete-orphan")
     threads: Mapped[list[Thread]] = relationship(back_populates="workspace", cascade="all, delete-orphan")
     files: Mapped[list[WorkspaceFile]] = relationship(back_populates="workspace", cascade="all, delete-orphan")
 
@@ -58,6 +59,7 @@ class UserAgent(Base):
     description: Mapped[str] = mapped_column(Text, default="")
     icon: Mapped[str] = mapped_column(String(64), default="")
     uses_document: Mapped[bool] = mapped_column(Boolean, default=True)
+    uses_canvas: Mapped[bool] = mapped_column(Boolean, default=False)
     document_template_md: Mapped[str] = mapped_column(Text, default="")
     agent_md: Mapped[str] = mapped_column(Text, default="")
     soul_md: Mapped[str] = mapped_column(Text, default="")
@@ -175,6 +177,23 @@ class DocumentRevision(Base):
     document: Mapped[Document] = relationship(back_populates="revisions")
 
 
+class Canvas(Base):
+    """Excalidraw scene stored as JSON (peer of Document in the Artifacts pane)."""
+
+    __tablename__ = "canvases"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    workspace_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), index=True)
+    title: Mapped[str] = mapped_column(String(255), default="Canvas")
+    scene_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    workspace: Mapped[Workspace] = relationship(back_populates="canvases")
+
+
 class Thread(Base):
     __tablename__ = "threads"
 
@@ -188,6 +207,9 @@ class Thread(Base):
     agent_kind: Mapped[str] = mapped_column(String(32), default="deep")
     active_document_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("documents.id", ondelete="SET NULL"), nullable=True
+    )
+    active_canvas_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("canvases.id", ondelete="SET NULL"), nullable=True
     )
     # Latest context meter + cumulative token spend for this thread.
     usage: Mapped[dict | None] = mapped_column(JSON, nullable=True)

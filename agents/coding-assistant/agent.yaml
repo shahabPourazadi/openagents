@@ -3,6 +3,7 @@ slug: coding-assistant
 description: Pair-programmer that edits files and verifies in the local or Docker sandbox. Chat-only (no document pane).
 icon: code
 uses_document: false
+uses_canvas: false
 tool_groups:
   hitl: true
   firecrawl: false
